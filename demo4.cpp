@@ -1,7 +1,7 @@
 //--------------------------------------------------------------------
 //	demo4.cpp.
 //	09/21/2024.				created.
-//	09/21/2024.				last modified.
+//	09/22/2024.				last modified.
 //--------------------------------------------------------------------
 //	*	Demonstrations of Agave(TM) Coroutine Framework 
 //		(based on ISO C++20 or later).
@@ -11,6 +11,7 @@
 //--------------------------------------------------------------------
 #include "Agave.hpp"
 #include <iostream>
+#include <iomanip>
 
 
 //--------------------------------------------------------------------
@@ -46,7 +47,7 @@ int main(void)
 	// lambda coroutine.
 	[operation](void) mutable -> agave::AsyncAction
 		{
-			std::wstring backspaces = { 8, 8, 8, 8, 0 };
+			std::wstring backspaces /*= { 8, 8, 8, 8, 0 }*/;
 			auto progress_reporter = operation.get_progress_reporter();
 			while (progress_reporter) // test if the process is completed (has next report).
 			{
@@ -55,7 +56,7 @@ int main(void)
 
 				// switch to foreground thread (UI) to report progress.
 				co_await agave::resume_foreground();
-				std::wcout << backspaces << std::right << std::setw(3) << i << L"%";
+                std::wcout << backspaces << std::right << std::setw(3) << i << L"%" << std::flush;
 			}
 
 			// switch to background to get the result.
@@ -64,7 +65,7 @@ int main(void)
 
 			// switch to foreground thread (UI) to display the result.
 			co_await agave::resume_foreground();
-			std::wcout << std::endl << L"Got the final result: " << v;
+			std::wcout << std::endl << L"Got the final result: " << v << std::endl;
 
 		}().get();
 
