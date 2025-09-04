@@ -1229,9 +1229,9 @@ namespace agave::details
 		}
 
 		//--------------------------------------------------------------------
-		template <typename T>
+		template <typename U>
 		decltype(auto)
-			await_transform(suspend_always_t<T> const& awaiter) noexcept
+			await_transform(suspend_always_t<U> const& awaiter) noexcept
 		{
 			return awaiter;
 		}
