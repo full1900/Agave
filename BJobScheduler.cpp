@@ -1,7 +1,7 @@
 //--------------------------------------------------------------------
 //	BJobScheduler.cpp.
 //	09/27/2022.				created.
-//	08/05/2024.				last modified.
+//	10/25/2025.				last modified.
 //--------------------------------------------------------------------
 //	*	Job Scheduler - A Part of Agave(TM) Coroutine Framework 
 //		(based on ISO C++20 or later).
@@ -240,7 +240,7 @@ agave::details::BJobScheduler::insert_new_job(
 		_pending_jobs.end(),
 		[&cur_tp](std::tuple<BJobToken, BTimePoint, BCallBack>& tup) -> bool
 		{
-			return cur_tp > std::get<BTimePoint>(tup);
+			return cur_tp < std::get<BTimePoint>(tup);
 		});
 
 	auto tok = agave::BJobToken{ _next_tok_id++ };
