@@ -267,7 +267,7 @@ agave::details::BJobScheduler::insert_new_job(std::tuple<BJobToken, BTimePoint, 
 		_pending_jobs.end(),
 		[&cur_tp](std::tuple<BJobToken, BTimePoint, BCallBack>& tup) -> bool
 		{
-			return cur_tp > std::get<BTimePoint>(tup);
+			return cur_tp < std::get<BTimePoint>(tup);
 		});
 
 	if (it == _pending_jobs.end())
