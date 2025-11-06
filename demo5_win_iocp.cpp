@@ -24,10 +24,10 @@ agave::AsyncAction read_file_async(HANDLE file);
 int main(void)
 {
 	create_demo_test_file();
-	auto iocp = agave::win::create_iocp();
+	auto iocp{ agave::win::create_iocp() };
 
-	HANDLE file = ::CreateFile(L"./iocp_test.txt", GENERIC_READ,
-		FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, nullptr);
+	HANDLE file{ ::CreateFile(L"./iocp_test.txt", GENERIC_READ,
+		FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, nullptr) };
 	
 	agave::win::join_iocp(file, iocp);
 	read_file_async(file).get();
@@ -35,8 +35,8 @@ int main(void)
 	::CloseHandle(file);
 	file = nullptr;
 
-	auto success = agave::win::close_iocp(iocp).get();
-	success = agave::win::cleanup().get();
+	auto success{ agave::win::close_iocp(iocp).get() }; // or clear all iocp handles vvv
+	//success = agave::win::cleanup().get();
 
 	return 0;
 }
@@ -45,14 +45,14 @@ int main(void)
 //--------------------------------------------------------------------
 agave::AsyncAction read_file_async(HANDLE file)
 {	
-	char buf[100] = { 0 };
+	char buf[100] { 0 };
 	
-	auto len = co_await agave::win::resume_on_iocp([file, &buf](LPOVERLAPPED ove)
+	auto len{ co_await agave::win::resume_on_iocp([file, &buf](LPOVERLAPPED ove)
 		{
 			if (!ove->hEvent)
 				ove->hEvent = ::CreateEvent(nullptr, true, false, nullptr);
-			bool res = ReadFile(file, buf, 100, nullptr, ove);
-		});
+			bool res = ::ReadFile(file, buf, 100, nullptr, ove);
+		}) };
 	
 	if (len > 0)
 		std::cout << buf << std::endl;
@@ -63,12 +63,14 @@ agave::AsyncAction read_file_async(HANDLE file)
 //--------------------------------------------------------------------
 bool create_demo_test_file(void)
 {
-	std::ofstream fs;
+	std::ofstream fs{ L"./iocp_test.txt", std::ios_base::trunc };
 	if (!fs)
 		return false;
-	fs.open(L"./iocp_test.txt", std::ios_base::trunc);
+
 	fs.write("demonstration", 13);
 	fs.close();
+	if (!fs)
+		return false;
 
 	return true;
 }
