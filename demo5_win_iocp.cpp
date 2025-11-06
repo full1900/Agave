@@ -23,7 +23,7 @@ agave::AsyncAction read_file_async(HANDLE file);
 //--------------------------------------------------------------------
 int main(void)
 {
-	create_demo_test_file();
+	create_demo_test_file(); // create a demo file.
 	auto iocp{ agave::win::create_iocp() };
 
 	HANDLE file{ ::CreateFile(L"./iocp_test.txt", GENERIC_READ,
@@ -35,8 +35,9 @@ int main(void)
 	::CloseHandle(file);
 	file = nullptr;
 
-	auto success{ agave::win::close_iocp(iocp).get() }; // or clear all iocp handles vvv
-	//success = agave::win::cleanup().get();
+	auto success{ agave::win::close_iocp(iocp).get() }; 
+	// VVV clear all iocp handles and release resources. VVV
+	success = agave::win::cleanup().get();
 
 	return 0;
 }
@@ -56,7 +57,6 @@ agave::AsyncAction read_file_async(HANDLE file)
 	
 	if (len > 0)
 		std::cout << buf << std::endl;
-	
 }
 
 
