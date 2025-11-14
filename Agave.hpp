@@ -1,7 +1,7 @@
 //--------------------------------------------------------------------
 //	Agave.hpp.
 //	09/27/2022.				created.
-//	08/20/2025.				last modified.
+//	11/11/2025.				last modified.
 //--------------------------------------------------------------------
 //	*	Agave(TM) Coroutine Framework (based on ISO C++20 or later).
 //	*	if has any questions, 
@@ -61,16 +61,18 @@ namespace agave
 
 
 	//--------------------------------------------------------------------
-	inline decltype(auto) resume_background(void)
+	inline decltype(auto) resume_background(
+		std::function<void(std::function<void(void)>)> current_entry = nullptr)
 	{
-		return details::bg_awaitable_t{ };
+		return details::bg_awaitable_t{ current_entry };
 	}
 
 
 	//--------------------------------------------------------------------
-	inline decltype(auto) resume_foreground(void)
+	inline decltype(auto) resume_foreground(
+		std::function<void(std::function<void(void)>)> current_entry = nullptr)
 	{
-		return details::fg_awaitable_t{ };
+		return details::fg_awaitable_t{ current_entry };
 	}
 
 

@@ -1,7 +1,7 @@
 //--------------------------------------------------------------------
 //	Iocp.cpp.
 //	08/18/2025.				created.
-//	08/21/2025.				last modified.
+//	11/14/2025.				last modified.
 //--------------------------------------------------------------------
 //	*	I/O Completion Ports (IOCP) on Windows module.
 //	*	Agave(TM) Coroutine Framework (based on ISO C++20 or later).
@@ -14,31 +14,50 @@
 #include <unordered_map>
 #include "../Agave.hpp"
 #include "../Recycler.hpp"
+#include "../QuickThreads.h"
 
 
 //--------------------------------------------------------------------
 namespace agave::win
 {
 	//--------------------------------------------------------------------
+	//	VVV -- used for internal only -- VVV
+	//--------------------------------------------------------------------
 	typedef struct _IOCP_Entry
 	{
 		OVERLAPPED					ove{ 0 };
 		std::coroutine_handle<>		h{ nullptr };
 		unsigned long				bytes_transferred{ 0 };
-		~_IOCP_Entry()
-		{
-			return;
-		}
 
 	} IOCP_Entry, * PIOCP_Entry;
 
 	//--------------------------------------------------------------------
-	std::unordered_map<HANDLE, std::vector<agave::AsyncAction>>		Handle2Actions;
-	agave::Recycler<IOCP_Entry>										recycler{ 30 };
+	class BG_Task : public ITask
+	{
+	public:
+		BG_Task(std::function<void(void)> cb) : _cb{ cb } { }
+		virtual void run(void) override { if (_cb) _cb(); }
+
+		std::function<void(void)>				_cb;
+	};
+
+	//--------------------------------------------------------------------
+	constexpr unsigned											RecycleSize{ 30 };
+	constexpr unsigned											QuickThreadNum{ 4 };
+
+	//--------------------------------------------------------------------
+	std::unordered_map<HANDLE, std::vector<agave::AsyncAction>>	Handle2Actions;
+	std::shared_ptr<QuickThreads>								quick_threads;
+	std::vector<agave::AsyncAction>								QuickThActions(QuickThreadNum);
+	agave::Recycler<IOCP_Entry>									recycler{ RecycleSize };
 
 	//--------------------------------------------------------------------
 	agave::AsyncAction run_task(HANDLE iocp);
+	agave::AsyncAction run_bg_async_task(std::shared_ptr<QuickThreads> quick_th);
 
+
+	//--------------------------------------------------------------------
+	//	^^^ -- used for internal only -- ^^^
 	//--------------------------------------------------------------------
 
 }
@@ -57,6 +76,13 @@ agave::win::create_iocp(unsigned long thread_num /*= 0*/)
 	if (iocp == INVALID_HANDLE_VALUE)
 		return nullptr;
 
+	if (!quick_threads)
+	{
+		quick_threads = std::shared_ptr<QuickThreads>{ new QuickThreads };
+		for (int i = 0; i < QuickThreadNum; ++i)
+			QuickThActions[i] = run_bg_async_task(quick_threads);
+	}
+
 	unsigned long long thread_quantity = !thread_num ? 
 		std::thread::hardware_concurrency() * 2 : thread_num;
 
@@ -70,17 +96,24 @@ agave::win::create_iocp(unsigned long thread_num /*= 0*/)
 
 
 //--------------------------------------------------------------------
-agave::AsyncOperation<long long> 
+agave::AsyncOperation<long long>
 agave::win::resume_on_iocp(std::function<void(LPOVERLAPPED ove)> ove_consumer)
 {
 	std::coroutine_handle<> h = co_await agave::get_raw_coroutine_handle();
 
 	std::shared_ptr<IOCP_Entry> entry{ recycler.create(), [](void*p)
 		{
-			recycler.recycle(reinterpret_cast<PIOCP_Entry>(p));
+			auto entry = reinterpret_cast<PIOCP_Entry>(p);
+			entry->h = nullptr;
+			recycler.recycle(entry);
 		} };
 
 	entry->h = h;
+
+	co_await agave::resume_background([](std::function<void(void)> entry) -> void
+		{
+			quick_threads->add_task(new BG_Task{ entry });
+		});
 	
 	co_await agave::suspend_always([entry, ove_consumer](std::coroutine_handle<> h)
 		{
@@ -99,7 +132,7 @@ agave::win::resume_on_iocp(std::function<void(LPOVERLAPPED ove)> ove_consumer)
 //--------------------------------------------------------------------
 bool 
 agave::win::join_iocp(
-	HANDLE work_handle, 
+	HANDLE work_handle,
 	HANDLE iocp)
 {
 	auto old_iocp = ::CreateIoCompletionPort(
@@ -145,6 +178,9 @@ agave::win::cleanup(void)
 {
 	co_await agave::resume_background();
 
+	if (quick_threads)
+		quick_threads->set_and_release_threads(true);
+
 	for (auto& v : Handle2Actions)
 	{
 		for (int i = 0; i < v.second.size(); ++i)
@@ -166,6 +202,12 @@ agave::win::cleanup(void)
 		delete data;
 	}
 
+	for (auto&& action : QuickThActions)
+		action.get();
+
+	QuickThActions.clear();
+	quick_threads.reset();
+
 	co_return true;
 }
 
@@ -176,7 +218,10 @@ namespace agave::win
 	//--------------------------------------------------------------------
 	agave::AsyncAction run_task(HANDLE iocp)
 	{
-		co_await agave::resume_background();
+		co_await agave::resume_background([](std::function<void(void)> entry)
+			{
+				std::thread([entry](void) { entry(); }).detach();
+			});
 
 		DWORD bytes_transferred{ 0 };
 		HANDLE work_handle{ nullptr };
@@ -211,7 +256,30 @@ namespace agave::win
 
 	}
 
+
 	//--------------------------------------------------------------------
+	agave::AsyncAction run_bg_async_task(std::shared_ptr<QuickThreads> quick_th)
+	{
+		co_await agave::resume_background([](std::function<void(void)> entry)
+			{
+				std::thread([entry](void) { entry(); }).detach();
+			});
+
+		while (true)
+		{
+			auto task = quick_th->join_and_get();
+			if (task)
+				task->run();
+			else
+				break;
+		}
+
+		co_return;
+	}
+
+
+	//--------------------------------------------------------------------
+
 
 }
 

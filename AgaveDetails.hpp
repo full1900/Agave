@@ -1,7 +1,7 @@
 //--------------------------------------------------------------------
 //	AgaveDetails.hpp.
 //	09/27/2022.				created.
-//	08/20/2025.				last modified.
+//	11/11/2025.				last modified.
 //--------------------------------------------------------------------
 //	*	Agave(TM) Coroutine Framework (based on ISO C++20 or later).
 //	*	if has any questions, 
@@ -38,22 +38,25 @@ namespace agave::details
 	class bg_awaitable_t
 	{
 	public:
+		bg_awaitable_t(std::function<void(std::function<void(void)>)> current_entry) :
+			_current_th{ current_entry } { }
+
 		constexpr bool await_ready() const noexcept { return false; }
 
 		void await_suspend(std::coroutine_handle<> h) const
 		{
-			if (details::__BGThread)
-			{
+			if (_current_th)
+				_current_th([h] { h.resume(); });
+			else if (details::__BGThread)
 				details::__BGThread([h] { h.resume(); });
-			}
 			else
-			{
 				std::thread([h] { h.resume(); }).detach();
-			}
 
 		}
 
 		constexpr void await_resume() const noexcept {}
+
+		std::function<void(std::function<void(void)>)>		_current_th;
 
 	};
 
@@ -64,20 +67,25 @@ namespace agave::details
 	class fg_awaitable_t
 	{
 	public:
+		fg_awaitable_t(std::function<void(std::function<void(void)>)> current_entry) :
+			_current_th{ current_entry } { }
+
 		constexpr bool await_ready() const noexcept { return false; }
 
 		void await_suspend(std::coroutine_handle<> h) const
 		{
-			if (details::__FGThread)
-			{
+			if (_current_th)
+				_current_th([h] { h.resume(); });
+			else if (details::__FGThread)
 				details::__FGThread([h] { h.resume(); });
-			}
 			else
 				h.resume();
 
 		}
 
 		constexpr void await_resume() const noexcept {}
+
+		std::function<void(std::function<void(void)>)>		_current_th;
 
 	};
 
