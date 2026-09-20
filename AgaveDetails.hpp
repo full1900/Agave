@@ -925,9 +925,15 @@ namespace agave::details
 		}
 
 		//--------------------------------------------------------------------
-		void await_suspend(std::coroutine_handle<> h) noexcept
+		bool await_suspend(std::coroutine_handle<> h) noexcept
 		{
+			std::lock_guard lck{ this->_async_data->_mx };
+
+			if (this->_async_data->_is_ready.load(std::memory_order_acquire))
+				return false;
+
 			this->_async_data->_h = h;
+			return true;
 		}
 
 		//--------------------------------------------------------------------
@@ -1096,9 +1102,15 @@ namespace agave::details
 		}
 
 		//--------------------------------------------------------------------
-		void await_suspend(std::coroutine_handle<> h) noexcept
+		bool await_suspend(std::coroutine_handle<> h) noexcept
 		{
+			std::lock_guard lck{ this->_async_data->_mx };
+
+			if (this->_async_data->_is_ready.load(std::memory_order_acquire))
+				return false;
+
 			this->_async_data->_h = h;
+			return true;
 		}
 
 		//--------------------------------------------------------------------
